@@ -24,6 +24,7 @@ int servoInitialPositions[16] = {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90
 // {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90, 90, 80, 120, 90}; initial position
 
 void setup() {
+  Wire.begin();
   Serial.begin(9600);
   pinMode(flameSensor, INPUT); // flame sensor DO pin connect as INPUT pin
   pinMode(pirSensor, INPUT); // PIR sensor OUT pin connect as INPUT pin
@@ -320,59 +321,68 @@ void walk(int servoList[], int servoPos[], int length, int dly) {
 
 // ------- Hand movement controle end ----------------
 // {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90, 90, 80, 120, 90}
-// int servoList[16];
-// int servoDegAngle[16];
-int len;
-int dly = 15;
 
-void step1() {
-  // ------- step 1 --------------
-  Serial.println("Step 1");
-  int servoList[] = {15, 7, 3, 11, 2, 10, 12, 13, 14};
-  int servoDegAngle[] = {100, 100, 100, 90, 120, 120, 120, 110, 130};
-  len = 6;
-  walk(servoList, servoDegAngle, len, dly);
+void increaseSync(int servo[], int deg[], int len) {
+  bool flag = true;
+  while(flag) {
+    for(int i = 0; i < len; i++ ) {
+      int servoPos = servoPosition[servo[i]];
+      // new position is greater then previous
+      if(servoPos < deg[i]){
+        int newPos = servoPos + 1;
+        pwm.setPWM(servo[i], 0, map(newPos, 0, 180, SERVOMIN, SERVOMAX));
+        servoPosition[servo[i]] = newPos;
+        flag = true;
+        delay(20);
+      } else {
+        flag = false;
+      }
+      new position is less then previous
+      if(servoPos > deg[i]){
+        int newPos = servoPos - 1;
+        pwm.setPWM(servo[i], 0, map(newPos, 0, 180, SERVOMIN, SERVOMAX));
+        servoPosition[servo[i]] = newPos;
+        flag = true;
+        delay(20);
+      } else {
+        flag = false;
+      }
+    }
+  }
 }
 
-void step2() {
-  // ------- step 2 --------------
-  Serial.println("Step 2");
-  int servoList2[] = {7, 4, 6, 14, 13};
-  int servoDegAngle2[] = {90, 100, 50, 120, 90};
-  walk(servoList2, servoDegAngle2, len, dly);
-}
-
-void step3() {
-  // ------- step 3 --------------
-  Serial.println("Step 3");
-  int servoList3[] = {12, 15, 2, 10, 4, 5};
-  int servoDegAngle3[] = {90, 75, 70, 70, 70, 70};
-  len = 4;
-  walk(servoList3, servoDegAngle3, len, dly);
-}
-
-void step4() {
-  // ------- step 4 --------------
-  Serial.println("Step 4");
-  int servoList4[] = {4, 5, 6, 15, 12, 13};
-  int servoDegAngle4[] = {90, 100, 60, 90, 70, 70};
-  len = 6;
-  walk(servoList4, servoDegAngle4, len, dly);
+void increaseOne(int servo, int deg, int dly) {
+    int prevPos = map(servoPosition[servo], 0, 180, SERVOMIN, SERVOMAX);
+    int newPos = map(deg, 0, 180, SERVOMIN, SERVOMAX);
+    if(prevPos < newPos) {
+      for(int j = prevPos; j < newPos; j++) {
+        pwm.setPWM(servo, 0, j);
+        delay(dly);
+      }
+    }
+    if(prevPos > newPos) {
+      for(int k = prevPos; k > newPos; k--) {
+        pwm.setPWM(servo, 0, k);
+        delay(dly);
+      }
+    }
+    servoPosition[servo] = deg;
 }
 
 void loop() {
-  step1();
-  // step2();
-  // step3();
-  // step4();
+  int servoNo11[] = {7, 15};
+  int servoPos11[] = {105, 105};
+  increaseSync(servoNo11, servoPos11, 2);
 
-  // int servoList5[] = {12, 15, 4, 5, 6};
-  // int servoDegAngle5[] = {90, 80, 70, 70, 50};
-  // len = 5;
-  // walk(servoList4, servoDegAngle4, len, dly);
+  int servoNo12[] = {11, 12, 13};
+  int servoPos12[] = {80, 120, 120};
+  increaseSync(servoNo12, servoPos12, 3);
 
+  int servoNo13[] = {12, 14, 4, 2, 10};
+  int servoPos13[] = {130, 140, 95, 110, 110};
+  increaseSync(servoNo13, servoPos13, 5);
 
-  // pwm.setPWM(12, 0, map(70, 0, 180, SERVOMIN, SERVOMAX));
-  // pwm.setPWM(13, 0, map(70, 0, 180, SERVOMIN, SERVOMAX));
-  // pwm.setPWM(14, 0, map(120, 0, 180, SERVOMIN, SERVOMAX));
+  // int servoNo21[] = {7, 15, 3};
+  // int servoPos21[] = {90, 90, 90};
+  // increaseSync(servoNo21, servoPos21, 3);
 }
