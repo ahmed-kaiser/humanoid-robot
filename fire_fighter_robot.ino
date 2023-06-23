@@ -4,8 +4,8 @@
 Servo headServo; 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
-#define SERVOMIN 102 // 0 degree;
-#define SERVOMAX 512 // 180 degree;
+#define SERVOMIN 150 // 0 degree;
+#define SERVOMAX 600 // 180 degree;
 #define SERVO_FREQ 50 // Analog servos run at ~50 Hz
 
 #define headServoPin 9
@@ -20,8 +20,8 @@ int distance;
 int headServoPosition = 90;
 bool motionState = false;
 
-int servoInitialPositions[16] = {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90, 90, 80, 120, 90};
-// {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90, 90, 80, 120, 90}; initial position
+const int servoInitialPositions[16] = {90, 90, 90, 88, 90, 90, 90, 90, 90, 90, 90, 92, 90, 90, 90, 90};
+int servoPosition[16] = {90, 90, 90, 88, 90, 90, 90, 90, 90, 90, 90, 92, 90, 90, 90, 90};
 
 void setup() {
   Wire.begin();
@@ -49,9 +49,8 @@ void setServo(int servo, int angle) {
 }
 
 void initialPosition() {
-  int positions[16] = {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90, 90, 80, 120, 90};
   for(int i = 0; i < 16; i++) {
-    setServo(i, positions[i]);
+    setServo(i, servoInitialPositions[i]);
   }
 }
 
@@ -253,136 +252,85 @@ void bothHandDown() {
   setPosition(servoNo, deg, 6);
 }
 
-void moveHandOnWalk() {
-  int servoNo[] = {0, 8, 1, 9, 2, 10};
-  int deg[] = {80, 100, 90, 90, 90, 90};
-  setPosition(servoNo, deg, 6);
-  int startTime = millis();
-  int currentTime = millis();
-  int duration = 20000;
-  int rightSholder = 2;
-  int leftSholder = 10;
-  int maxDeg = map(120, 0, 180, SERVOMIN, SERVOMAX);
-  int minDeg = map(60, 0, 180, SERVOMIN, SERVOMAX);
-  while(currentTime - startTime < duration) {
-      for(int i = minDeg; i < maxDeg; i++) {
-        pwm.setPWM(rightSholder, 0, i);
-        pwm.setPWM(leftSholder, 0, i);
-        delay(30);
-      }
-      for(int j = maxDeg; j > minDeg; j--) {
-        pwm.setPWM(rightSholder, 0, j);
-        pwm.setPWM(leftSholder, 0, j);
-        delay(30);
-      }
-      currentTime = millis();
-    }
+// ---------------- Walk function ----------------------
+void walk() {
+
+  int servoNo12[] = {2, 10, 13, 12, 5, 4};
+  int servoPos12[] = {110, 110, 120, 110, 120, 110};
+  increaseSync(servoNo12, servoPos12, 6);
+
+  int servoNo13[] = {2, 10, 13, 12, 5, 4};
+  int servoPos13[] = {70, 70, 60, 70, 60, 70};
+  increaseSync(servoNo13, servoPos13, 6);
+
+  ///...........................................................
+  // int servoNo11[] = {7, 15};
+  // int servoPos11[] = {100, 100};
+  // increaseSync(servoNo11, servoPos11, 2);
+
+  // int servoNo12[] = {2, 10, 13, 12, 7, 15};
+  // int servoPos12[] = {110, 110, 120, 110, 90, 90};
+  // increaseSync(servoNo12, servoPos12, 6);
+
+  // int servoNo13[] = {6, 14, 5, 4};
+  // int servoPos13[] = {80, 80, 120, 110};
+  // increaseSync(servoNo13, servoPos13, 4);
+
+  // int servoNo21[] = {7, 15};
+  // int servoPos21[] = {80, 80};
+  // increaseSync(servoNo21, servoPos21, 2);
+
+  // int servoNo22[] = {2, 10, 5, 4, 7, 15};
+  // int servoPos22[] = {70, 70, 60, 70, 90, 90};
+  // increaseSync(servoNo22, servoPos22, 4);
+
+  // int servoNo23[] = {6, 14, 13, 12};
+  // int servoPos23[] = {90, 90, 60, 70};
+  // increaseSync(servoNo23, servoPos23, 4);
 }
 
-void balanceRight() {
-  int maxDeg = map(100, 0, 180, SERVOMIN, SERVOMAX);
-  int minDeg = map(90, 0, 180, SERVOMIN, SERVOMAX);
-  int servoNo = 7;
-  for(int i = minDeg; i <= maxDeg; i++) {
-    pwm.setPWM(servoNo, 0, i);
-    delay(30);
-  }
-  delay(3000);
-  // for(int j = maxDeg; j >= minDeg; j--) {
-  //   pwm.setPWM(servoNo, 0, j);
-  //   delay(30);
-  // }
+void slideRight() {
+  int servoNo1[] = {3, 11};
+  int servoPos1[] = {80, 100};
+  increaseSync(servoNo1, servoPos1, 2);
+
+  int servoNo2[] = {3, 11};
+  int servoPos2[] = {90, 90};
+  increaseSync(servoNo2, servoPos2, 2);
 }
-
-// servoInitialPositions[16] = {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90, 90, 80, 120, 90};
-int servoPosition[16] = {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90, 90, 80, 120, 90};
-
-void walk(int servoList[], int servoPos[], int length, int dly) {
-  for(int i = 0; i < length; i++) {
-    int prevPos = map(servoPosition[servoList[i]], 0, 180, SERVOMIN, SERVOMAX);
-    int newPos = map(servoPos[i], 0, 180, SERVOMIN, SERVOMAX);
-    if(prevPos < newPos) {
-      for(int j = prevPos; j < newPos; j++) {
-        pwm.setPWM(servoList[i], 0, j);
-        delay(dly);
-      }
-      servoPosition[servoList[i]] = servoPos[i];
-    }
-    if(prevPos > newPos) {
-      for(int k = prevPos; k > newPos; k--) {
-        pwm.setPWM(servoList[i], 0, k);
-        delay(dly);
-      }
-      servoPosition[servoList[i]] = servoPos[i];
-    }
-  }
-}
-
 
 // ------- Hand movement controle end ----------------
-// {90, 90, 90, 90, 90, 100, 60, 90, 90, 90, 90, 90, 90, 80, 120, 90}
-
-void increaseSync(int servo[], int deg[], int len) {
-  bool flag = true;
-  while(flag) {
-    for(int i = 0; i < len; i++ ) {
-      int servoPos = servoPosition[servo[i]];
-      // new position is greater then previous
-      if(servoPos < deg[i]){
-        int newPos = servoPos + 1;
-        pwm.setPWM(servo[i], 0, map(newPos, 0, 180, SERVOMIN, SERVOMAX));
-        servoPosition[servo[i]] = newPos;
-        flag = true;
-        delay(20);
-      } else {
-        flag = false;
-      }
-      new position is less then previous
-      if(servoPos > deg[i]){
-        int newPos = servoPos - 1;
-        pwm.setPWM(servo[i], 0, map(newPos, 0, 180, SERVOMIN, SERVOMAX));
-        servoPosition[servo[i]] = newPos;
-        flag = true;
-        delay(20);
-      } else {
-        flag = false;
-      }
-    }
-  }
+int calcPos(int deg) {
+  return map(deg, 0, 180, SERVOMIN, SERVOMAX);
 }
 
-void increaseOne(int servo, int deg, int dly) {
-    int prevPos = map(servoPosition[servo], 0, 180, SERVOMIN, SERVOMAX);
-    int newPos = map(deg, 0, 180, SERVOMIN, SERVOMAX);
-    if(prevPos < newPos) {
-      for(int j = prevPos; j < newPos; j++) {
-        pwm.setPWM(servo, 0, j);
-        delay(dly);
-      }
+void increaseSync(int servo[], int deg[], int len) {
+  int flag = 0;
+  int count = 0;
+  while(flag < len) {
+    int prevPos = servoPosition[servo[count]];
+    int newPos = deg[count];
+    if(prevPos < newPos){
+        int pos = prevPos + 1;
+        pwm.setPWM(servo[count], 0, calcPos(pos));
+        servoPosition[servo[count]] = pos;
+    }else if(prevPos > newPos){
+        int pos = prevPos - 1;
+        pwm.setPWM(servo[count], 0, calcPos(pos));
+        servoPosition[servo[count]] = pos;
+    } else if (prevPos == newPos) {
+        flag = flag + 1;
+    } 
+    delay(10);
+    count++;
+
+    if(count == len) {
+      count = 0;
     }
-    if(prevPos > newPos) {
-      for(int k = prevPos; k > newPos; k--) {
-        pwm.setPWM(servo, 0, k);
-        delay(dly);
-      }
-    }
-    servoPosition[servo] = deg;
+  }
 }
 
 void loop() {
-  int servoNo11[] = {7, 15};
-  int servoPos11[] = {105, 105};
-  increaseSync(servoNo11, servoPos11, 2);
-
-  int servoNo12[] = {11, 12, 13};
-  int servoPos12[] = {80, 120, 120};
-  increaseSync(servoNo12, servoPos12, 3);
-
-  int servoNo13[] = {12, 14, 4, 2, 10};
-  int servoPos13[] = {130, 140, 95, 110, 110};
-  increaseSync(servoNo13, servoPos13, 5);
-
-  // int servoNo21[] = {7, 15, 3};
-  // int servoPos21[] = {90, 90, 90};
-  // increaseSync(servoNo21, servoPos21, 3);
+  walk();
+  // slideRight();
 }
