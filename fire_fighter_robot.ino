@@ -32,6 +32,7 @@ Servo LL1;
 Servo LL2;
 Servo LL3;
 Servo LL4;
+Servo Head;
 
 dht DHT;
 
@@ -48,8 +49,9 @@ Servo servos[] = {
 const int DHT_PIN = 46;
 const int flameSensor = 47;
 const int gasSensor = A15;
-const int trigPin = 49;
-const int echoPin = 50;
+const int trigPin = 2;
+const int echoPin = 3;
+const int headServo = 29;
 
 const int servoPin[] = {
   30, 32, 34, 36, 38, 40, 42, 44,
@@ -60,6 +62,11 @@ const int initialPosition[] = {
   90, 90, 90, 90, 90, 90, 85, 90, 
   90, 90, 90, 90, 90, 90, 95, 90
 };
+
+long duration;
+int distance;
+const int headInitialPosition = 82;
+int headServoPosition = headInitialPosition;
 
 int servoPositions[] = {
   90, 90, 90, 90, 90, 90, 85, 90, 
@@ -74,7 +81,14 @@ void setup() {
   Blynk.begin(BLYNK_AUTH_TOKEN, wifi, ssid, pass);
 
   pinMode(DHT_PIN, INPUT);
+  pinMode(flameSensor, INPUT);
+  pinMode(gasSensor, INPUT);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(headServo, OUTPUT);
 
+  Head.attach(headServo);
+  Head.write(headInitialPosition);
   for (int i = 0; i < numServos; i++) {
     servos[i].attach(servoPin[i]);
   }
@@ -89,62 +103,69 @@ void setServoToInitialPosition(){
   }
 }
 
-void updateData(int servoNo, int servoPosition) {
+void updatePosition(int servoNo, int servoPosition) {
   servos[servoNo].write(servoPosition);
   servoPositions[servoNo] = servoPosition;
   delay(5);
 }
 
 void updateServoPosition(int updateServos[], int positions[], int numServos) {
-  int flag = 0;
-  int i = 0;
-  while (flag < numServos) {
-    int prevPosition = servoPositions[updateServos[i]];
-    int newPosition = positions[i];
-    Serial.print(prevPosition);
-    Serial.print("-");
-    Serial.println(newPosition);
+  bool flag = true; // Flag to track if the array has been changed
+  int i = 0;        // Loop variable to iterate through servos
+  while (numServos > 0) {
+    int prevPosition = servoPositions[updateServos[i]];  // Previous position of the servo
+    int newPosition = positions[i];                      // New position for the servo
+    int position = 0;                                    // Intermediate position for gradual update
     if (prevPosition < newPosition) {
-      int position = prevPosition + 1;
-      updateData(updateServos[i], position);
+      position = prevPosition + 1;                       // Increment position gradually
+      updatePosition(updateServos[i], position);         // Update the servo position
     } else if (prevPosition > newPosition) {
-      int position = prevPosition - 1;
-      updateData(updateServos[i], position);
-    } else if (prevPosition == newPosition) {
-      flag = flag + 1;
-      Serial.println(flag);
+      position = prevPosition - 1;                       // Decrement position gradually
+      updatePosition(updateServos[i], position);         // Update the servo position
+    } else {
+      // If the servo position is already equal to the new position, remove it from the array
+      for(int j = i; j < numServos - 1; j++) {
+        updateServos[j] = updateServos[j+1];
+        positions[j] = positions[j+1];
+      }
+      numServos--;
+      flag = false;  // Array has been changed
     }
 
-    if (i == numServos - 1) {
-      i = 0;
-    } else {
+    // If the array has not been changed, increment the loop variable
+    if(flag){
       i++;
+    } else {
+      flag = true;  // Reset the flag for the next iteration
     }
+    
+    // If the loop variable reaches the last servo, reset it to 0 for circular iteration
+    if (i == numServos) {
+      i = 0;
+    } 
   }
 }
 
+// ---------- Right Hand -------------------
 void rightHandUpForward() {
-  Serial.println("rightHandUpForward");
-  int updateServos[] = {0, 1, 2};
-  int newPositions[] = {90, 90, 180};
-  updateServoPosition(updateServos, newPositions, 3);
+  int updateServos1[] = {0, 1, 2};
+  int newPositions1[] = {90, 90, 180};
+  updateServoPosition(updateServos1, newPositions1, 3);
 }
 
 void rightHandDown() {
-  Serial.println("rightHandDown");
-  int updateServos[] = {0, 1, 2};
-  int newPositions[] = {90, 90, 90};
-  updateServoPosition(updateServos, newPositions, 3);
+  int updateServos2[] = {0, 1, 2};
+  int newPositions2[] = {90, 90, 90};
+  updateServoPosition(updateServos2, newPositions2, 3);
 }
 
 void rightHandUpSide() {
-  Serial.println("rightHandUpSide");
-  int updateServos[] = {0, 1, 2};
-  int newPositions[] = {90, 180, 90};
-  updateServoPosition(updateServos, newPositions, 3);
+  int updateServos3[] = {0, 1, 2};
+  int newPositions3[] = {90, 180, 90};
+  updateServoPosition(updateServos3, newPositions3, 3);
 }
 
-
+// ---------- Left Hand -------------------
 void leftHandUpForward() {
   int updateServos[] = {8, 9, 10};
   int newPositions[] = {90, 90, 0};
@@ -163,7 +184,7 @@ void leftHandUpSide() {
   updateServoPosition(updateServos, newPositions, 3);
 }
 
-
+// ---------- Both Hand -------------------
 void bothHandUpForward() {
   int updateServos[] = {0, 1, 8, 9, 2, 10};
   int newPositions[] = {90, 90, 90, 90, 180, 0};
@@ -184,15 +205,15 @@ void bothHandDown() {
 
 void walk() {
   int servoNo12[] = {2, 10, 13, 12, 5, 4};
-  int servoPos12[] = {110, 110, 120, 110, 120, 110};
+  int servoPos12[] = {110, 110, 120, 120, 120, 120};
   updateServoPosition(servoNo12, servoPos12, 6);
 
   int servoNo13[] = {2, 10, 5, 4, 13, 12};
-  int servoPos13[] = {70, 70, 60, 70, 60, 70};
+  int servoPos13[] = {70, 70, 60, 60, 60, 60};
   updateServoPosition(servoNo13, servoPos13, 6);
 }
 
-// DHT sensor 
+// --------- Temperature and Humidity detection -------------- 
 void checkTemperatureAndHumidity() {
   int data = DHT.read11(DHT_PIN);
   float teperature = DHT.temperature;
@@ -201,20 +222,77 @@ void checkTemperatureAndHumidity() {
   Blynk.virtualWrite(vHumidity, humidity);
 }
 
+// ----------- Air quality detection -------------
 void checkAirQuality() {
   int air_quality = analogRead(gasSensor);
   Blynk.virtualWrite(vAirQuality, air_quality);
 }
 
+// ------------ Obstacle detection -----------
+void calculateDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.0133 / 2;
+}
+
+void rotateServo(int newPosition) {
+  if(newPosition > headServoPosition) {
+    for(;headServoPosition <= newPosition; headServoPosition++) {
+      Head.write(headServoPosition);
+      delay(10);
+    }
+  }else {
+    for(; headServoPosition >= newPosition; headServoPosition--) {
+      Head.write(headServoPosition);
+      delay(10);
+    }
+  }
+  delay(200);
+}
+
+int lookRight() {
+  rotateServo(10);
+  calculateDistance();
+  delay(50);
+  return distance;
+}
+
+int lookLeft() {
+  rotateServo(170);
+  calculateDistance();
+  delay(50);
+  return distance;
+}
+
+void checkObstacle() {
+  calculateDistance();
+  if(distance < 12) {
+    Serial.println(distance);
+    int rightDistance = lookRight();
+    rotateServo(headInitialPosition);
+    int leftDistance = lookLeft();
+    if(rightDistance > leftDistance) {
+      Serial.println("Moving toward right");
+    }else{
+      Serial.println("Moving toward left");
+    }
+    rotateServo(headInitialPosition);
+  }
+}
+
+// -------------- Fire detection ----------------
 
 unsigned long startTime = millis();
-bool callRightHandUpForward = false, callRightHandUpSide = false, callRightHandDown = false;
-bool callLeftHandUpForward = false, callLeftHandUpSide = false, callLeftHandDown = false;
-bool callBothHandUpForward = false, callBothHandUpSide = false, callBothHandDown = false;
+bool onWalkMode = false, onFireDetectionMode = false, onObstacleDetectionMode = false;
 
 void loop() {
   Blynk.run();
 
+  // Check and update the Temperature, Humidity and Air quality data in every 5 seconds
   unsigned long presentTime = millis();
   int interval = presentTime - startTime;
   if(interval > 5000){
@@ -223,72 +301,32 @@ void loop() {
     checkAirQuality();
   }
 
-  // if(callRightHandUpForward) {
-  //   rightHandUpForward();
-  // }else if(callRightHandUpSide) {
-  //   rightHandUpSide();
-  // }else if(callRightHandDown) {
-  //   rightHandDown();
-  // }
+  if(onWalkMode) {
+    walk();
+  }
 
-  // if(callLeftHandUpForward) {
-  //   leftHandUpForward();
-  // }else if(callLeftHandUpSide) {
-  //   leftHandUpSide();
-  // }else if(callLeftHandDown) {
-  //   leftHandDown();
-  // }
-
-  // if(callBothHandUpForward) {
-  //   bothHandUpForward();
-  // }else if(callBothHandUpSide) {
-  //   bothHandUpSide();
-  // }else if(callBothHandDown) {
-  //   bothHandDown();
-  // }
-
-  // rightHandUpForward();
-  // rightHandDown();
-  // rightHandUpSide();
-
-  // leftHandUpForward();
-  // leftHandDown();
-  // leftHandUpSide();
-
-  // bothHandUpSide();
-  // bothHandUpForward();
-
-  // walk();
+  if(onObstacleDetectionMode) {
+    checkObstacle();
+  }
+  
 }
 
-// left hand
+// Controll left hand
 BLYNK_WRITE(V2) {
   int value = param.asInt(); // Get value from app widget
   switch (value) {
     case 1:
-      callLeftHandUpForward = false;
-      callLeftHandUpSide = false;
-      callLeftHandDown = true;
+      leftHandDown();
       break;
     case 2:
-      callLeftHandUpForward = true;
-      callLeftHandUpSide = false;
-      callLeftHandDown = false;
-      break;
-    case 3:
-      callLeftHandUpForward = false;
-      callLeftHandUpSide = true;
-      callLeftHandDown = false;
+      leftHandUpForward();
       break;
     default:
-      callLeftHandUpForward = false;
-      callLeftHandUpSide = false;
-      callLeftHandDown = true;
+      leftHandUpSide();
   }
-
 }
 
-// right hand
+// Controll right hand
 BLYNK_WRITE(V3) {
   int value = param.asInt(); // Get value from app widget
   switch (value) {
@@ -298,36 +336,52 @@ BLYNK_WRITE(V3) {
     case 2:
       rightHandUpForward();
       break;
-    case 3:
-      rightHandUpSide();
-      break;
     default:
-      rightHandDown();
+      rightHandUpSide();
   }
 }
 
-// both hand
+// Controll both hand
 BLYNK_WRITE(V5) {
   int value = param.asInt(); // Get value from app widget
   switch (value) {
     case 1:
-      callBothHandUpForward = false;
-      callBothHandUpSide = false;
-      callBothHandDown = true;
+      bothHandDown();
       break;
     case 2:
-      callBothHandUpForward = true;
-      callBothHandUpSide = false;
-      callBothHandDown = false;
-      break;
-    case 3:
-      callBothHandUpForward = false;
-      callBothHandUpSide = true;
-      callBothHandDown = false;
+      bothHandUpForward();
       break;
     default:
-      callBothHandUpForward = false;
-      callBothHandUpSide = false;
-      callBothHandDown = true;
+      bothHandUpSide();
+  }
+}
+
+// Controll walk mode
+BLYNK_WRITE(V6) {
+  int value = param.asInt(); // Get value from app widget
+  if(value == 1) {
+    onWalkMode = true;
+  } else {
+    onWalkMode = false;
+  }
+}
+
+// Controll obstacle detection
+BLYNK_WRITE(V7) {
+  int value = param.asInt(); // Get value from app widget
+  if(value == 1) {
+    onObstacleDetectionMode = true;
+  } else {
+    onObstacleDetectionMode = false;
+  }
+}
+
+// Controll fire detection
+BLYNK_WRITE(V8) {
+  int value = param.asInt(); // Get value from app widget
+  if(value == 1) {
+    onFireDetectionMode = true;
+  } else {
+    onFireDetectionMode = false;
   }
 }
