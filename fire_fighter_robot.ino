@@ -45,13 +45,15 @@ Servo servos[] = {
 #define vTemperature V0
 #define vHumidity V1
 #define vAirQuality V4
+#define vFlame V9
 
-const int DHT_PIN = 46;
-const int flameSensor = 47;
-const int gasSensor = A15;
-const int trigPin = 2;
-const int echoPin = 3;
-const int headServo = 29;
+#define DHT_PIN  46
+#define flameSensorDI  47
+#define flameSensorAI  A14
+#define gasSensor  A15
+#define trigPin  2
+#define echoPin  3
+#define headServo  29
 
 const int servoPin[] = {
   30, 32, 34, 36, 38, 40, 42, 44,
@@ -68,6 +70,9 @@ int distance;
 const int headInitialPosition = 82;
 int headServoPosition = headInitialPosition;
 
+const int flameMinDistance = 0;
+const int flameMaxDistance = 16;
+
 int servoPositions[] = {
   90, 90, 90, 90, 90, 90, 85, 90, 
   90, 90, 90, 90, 90, 90, 95, 90
@@ -81,7 +86,8 @@ void setup() {
   Blynk.begin(BLYNK_AUTH_TOKEN, wifi, ssid, pass);
 
   pinMode(DHT_PIN, INPUT);
-  pinMode(flameSensor, INPUT);
+  pinMode(flameSensorDI, INPUT);
+  pinMode(flameSensorAI, INPUT);
   pinMode(gasSensor, INPUT);
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -186,9 +192,9 @@ void leftHandUpSide() {
 
 // ---------- Both Hand -------------------
 void bothHandUpForward() {
-  int updateServos[] = {0, 1, 8, 9, 2, 10};
-  int newPositions[] = {90, 90, 90, 90, 180, 0};
-  updateServoPosition(updateServos, newPositions, 6);
+  int updateServos[] = {0, 1, 8, 9, 5, 13, 2, 10};
+  int newPositions[] = {90, 90, 90, 90, 88, 92, 180, 0};
+  updateServoPosition(updateServos, newPositions, 8);
 }
 
 void bothHandUpSide() {
@@ -198,9 +204,9 @@ void bothHandUpSide() {
 }
 
 void bothHandDown() {
-  int updateServos[] = {0, 2, 8, 10, 1, 9};
-  int newPositions[] = {90, 90, 90, 90, 90, 90};
-  updateServoPosition(updateServos, newPositions, 6);
+  int updateServos[] = {0, 1, 8, 9, 5, 13, 2, 10};
+  int newPositions[] = {90, 90, 90, 90, 90, 90, 90, 90};
+  updateServoPosition(updateServos, newPositions, 8);
 }
 
 void walk() {
@@ -211,6 +217,12 @@ void walk() {
   int servoNo13[] = {2, 10, 5, 4, 13, 12};
   int servoPos13[] = {70, 70, 60, 60, 60, 60};
   updateServoPosition(servoNo13, servoPos13, 6);
+}
+
+void stand() {
+  int servoNo[] = {2, 10, 5, 4, 13, 12};
+  int servoPos[] = {90, 90, 90, 90, 90, 90};
+  updateServoPosition(servoNo, servoPos, 6);
 }
 
 // --------- Temperature and Humidity detection -------------- 
@@ -285,6 +297,13 @@ void checkObstacle() {
 }
 
 // -------------- Fire detection ----------------
+void detectFlame() {
+  if(digitalRead(flameSensorDI) == 1) {
+    int data = analogRead(flameSensorAI);
+    int flameDistance = map(data, 0, 600, flameMinDistance, flameMaxDistance);
+    Blynk.virtualWrite(vFlame, data);
+  }
+}
 
 unsigned long startTime = millis();
 bool onWalkMode = false, onFireDetectionMode = false, onObstacleDetectionMode = false;
@@ -309,9 +328,12 @@ void loop() {
     checkObstacle();
   }
   
+  if(onFireDetectionMode) {
+    detectFlame();
+  }
 }
 
-// Controll left hand
+// Controll Hand
 BLYNK_WRITE(V2) {
   int value = param.asInt(); // Get value from app widget
   switch (value) {
@@ -321,34 +343,22 @@ BLYNK_WRITE(V2) {
     case 2:
       leftHandUpForward();
       break;
-    default:
+    case 3:
       leftHandUpSide();
-  }
-}
-
-// Controll right hand
-BLYNK_WRITE(V3) {
-  int value = param.asInt(); // Get value from app widget
-  switch (value) {
-    case 1:
+      break;
+    case 4:
       rightHandDown();
       break;
-    case 2:
+    case 5:
       rightHandUpForward();
       break;
-    default:
+    case 6:
       rightHandUpSide();
-  }
-}
-
-// Controll both hand
-BLYNK_WRITE(V5) {
-  int value = param.asInt(); // Get value from app widget
-  switch (value) {
-    case 1:
+      break;
+    case 7:
       bothHandDown();
       break;
-    case 2:
+    case 8:
       bothHandUpForward();
       break;
     default:
@@ -360,9 +370,11 @@ BLYNK_WRITE(V5) {
 BLYNK_WRITE(V6) {
   int value = param.asInt(); // Get value from app widget
   if(value == 1) {
+    stand();
     onWalkMode = true;
   } else {
     onWalkMode = false;
+    stand();
   }
 }
 
