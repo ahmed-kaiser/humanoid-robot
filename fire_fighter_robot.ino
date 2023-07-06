@@ -13,8 +13,8 @@
 #define ESP8266_BAUD 9600
 ESP8266 wifi(&EspSerial);
 
-char ssid[] = "NO-INTERNET";
-char pass[] = "#p@ssword535909#";
+char ssid[] = "NO-INTERNET"; // test
+char pass[] = "#p@ssword535909#"; // 200312003
 
 Servo RH1;
 Servo RH2;
@@ -53,7 +53,14 @@ Servo servos[] = {
 #define gasSensor  A15
 #define trigPin  2
 #define echoPin  3
-#define headServo  29
+#define pir 48
+#define pumpRelay 49
+#define headServo  50
+
+const int dly5 = 5;
+const int dly10 = 10;
+const int dly15 = 15;
+const int dly20 = 20;
 
 const int servoPin[] = {
   30, 32, 34, 36, 38, 40, 42, 44,
@@ -61,21 +68,29 @@ const int servoPin[] = {
 };
 
 const int initialPosition[] = {
-  90, 90, 90, 90, 90, 90, 85, 90, 
-  90, 90, 90, 90, 90, 90, 95, 90
+  90, 90, 90, 88, 90, 90, 85, 90, 
+  90, 90, 90, 92, 90, 90, 95, 90
+};
+
+const int initialPosition2[] = {
+  90, 90, 90, 88, 90, 65, 65, 90, 
+  90, 90, 90, 92, 90, 115, 115, 90
 };
 
 long duration;
 int distance;
 const int headInitialPosition = 82;
 int headServoPosition = headInitialPosition;
+int state = LOW; 
+
+bool onWalkMode = false, onFireDetectionMode = false, onObstacleDetectionMode = false, onMotionDetectionMode = false;
 
 const int flameMinDistance = 0;
 const int flameMaxDistance = 16;
 
 int servoPositions[] = {
-  90, 90, 90, 90, 90, 90, 85, 90, 
-  90, 90, 90, 90, 90, 90, 95, 90
+  90, 90, 90, 88, 90, 90, 85, 90, 
+  90, 90, 90, 92, 90, 90, 95, 90
 };
 
 int numServos = sizeof(servos) / sizeof(servos[0]);
@@ -92,6 +107,8 @@ void setup() {
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
   pinMode(headServo, OUTPUT);
+  pinMode(pumpRelay, OUTPUT);
+  digitalWrite(pumpRelay, HIGH);
 
   Head.attach(headServo);
   Head.write(headInitialPosition);
@@ -109,13 +126,13 @@ void setServoToInitialPosition(){
   }
 }
 
-void updatePosition(int servoNo, int servoPosition) {
+void updatePosition(int servoNo, int servoPosition, int dly) {
   servos[servoNo].write(servoPosition);
   servoPositions[servoNo] = servoPosition;
-  delay(5);
+  delay(dly);
 }
 
-void updateServoPosition(int updateServos[], int positions[], int numServos) {
+void updateServoPosition(int updateServos[], int positions[], int numServos,  int dly) {
   bool flag = true; // Flag to track if the array has been changed
   int i = 0;        // Loop variable to iterate through servos
   while (numServos > 0) {
@@ -124,10 +141,10 @@ void updateServoPosition(int updateServos[], int positions[], int numServos) {
     int position = 0;                                    // Intermediate position for gradual update
     if (prevPosition < newPosition) {
       position = prevPosition + 1;                       // Increment position gradually
-      updatePosition(updateServos[i], position);         // Update the servo position
+      updatePosition(updateServos[i], position, dly);         // Update the servo position
     } else if (prevPosition > newPosition) {
       position = prevPosition - 1;                       // Decrement position gradually
-      updatePosition(updateServos[i], position);         // Update the servo position
+      updatePosition(updateServos[i], position, dly);         // Update the servo position
     } else {
       // If the servo position is already equal to the new position, remove it from the array
       for(int j = i; j < numServos - 1; j++) {
@@ -156,73 +173,113 @@ void updateServoPosition(int updateServos[], int positions[], int numServos) {
 void rightHandUpForward() {
   int updateServos1[] = {0, 1, 2};
   int newPositions1[] = {90, 90, 180};
-  updateServoPosition(updateServos1, newPositions1, 3);
+  updateServoPosition(updateServos1, newPositions1, 3, dly10);
 }
 
 void rightHandDown() {
   int updateServos2[] = {0, 1, 2};
   int newPositions2[] = {90, 90, 90};
-  updateServoPosition(updateServos2, newPositions2, 3);
+  updateServoPosition(updateServos2, newPositions2, 3, dly10);
 }
 
 void rightHandUpSide() {
   int updateServos3[] = {0, 1, 2};
   int newPositions3[] = {90, 180, 90};
-  updateServoPosition(updateServos3, newPositions3, 3);
+  updateServoPosition(updateServos3, newPositions3, 3, dly10);
 }
 
 // ---------- Left Hand -------------------
 void leftHandUpForward() {
   int updateServos[] = {8, 9, 10};
   int newPositions[] = {90, 90, 0};
-  updateServoPosition(updateServos, newPositions, 3);
+  updateServoPosition(updateServos, newPositions, 3, dly5);
 }
 
 void leftHandDown() {
   int updateServos[] = {8, 9, 10};
   int newPositions[] = {90, 90, 90};
-  updateServoPosition(updateServos, newPositions, 3);
+  updateServoPosition(updateServos, newPositions, 3, dly5);
 }
 
 void leftHandUpSide() {
   int updateServos[] = {8, 9, 10};
   int newPositions[] = {90, 0, 90};
-  updateServoPosition(updateServos, newPositions, 3);
+  updateServoPosition(updateServos, newPositions, 3, dly5);
 }
 
 // ---------- Both Hand -------------------
 void bothHandUpForward() {
-  int updateServos[] = {0, 1, 8, 9, 5, 13, 2, 10};
-  int newPositions[] = {90, 90, 90, 90, 88, 92, 180, 0};
-  updateServoPosition(updateServos, newPositions, 8);
+  int updateServos[] = {0, 1, 8, 9, 2, 10};
+  int newPositions[] = {90, 90, 90, 90, 180, 0};
+  updateServoPosition(updateServos, newPositions, 6, dly5);
 }
 
 void bothHandUpSide() {
   int updateServos[] = {0, 2, 8, 10, 1, 9};
   int newPositions[] = {90, 90, 90, 90, 180, 0};
-  updateServoPosition(updateServos, newPositions, 6);
+  updateServoPosition(updateServos, newPositions, 6, dly5);
 }
 
 void bothHandDown() {
-  int updateServos[] = {0, 1, 8, 9, 5, 13, 2, 10};
-  int newPositions[] = {90, 90, 90, 90, 90, 90, 90, 90};
-  updateServoPosition(updateServos, newPositions, 8);
+  int updateServos[] = {0, 1, 8, 9, 2, 10};
+  int newPositions[] = {90, 90, 90, 90, 90, 90};
+  updateServoPosition(updateServos, newPositions, 6, dly5);
 }
 
-void walk() {
-  int servoNo12[] = {2, 10, 13, 12, 5, 4};
-  int servoPos12[] = {110, 110, 120, 120, 120, 120};
-  updateServoPosition(servoNo12, servoPos12, 6);
+// void walk() {
+  //   int servoNo11[] = {7, 15};
+  // int servoPos11[] = {100, 90};
+  // updateServoPosition(servoNo11, servoPos11, 2, 7);
 
-  int servoNo13[] = {2, 10, 5, 4, 13, 12};
-  int servoPos13[] = {70, 70, 60, 60, 60, 60};
-  updateServoPosition(servoNo13, servoPos13, 6);
+  // int servoNo12[] = {13, 12, 5, 4, 2, 10};
+  // int servoPos12[] = {105, 105, 105, 105, 100, 100};
+  // updateServoPosition(servoNo12, servoPos12, 6, 2);
+
+  // int servoNo31[] = {15, 7};
+  // int servoPos31[] = {80, 90};
+  // updateServoPosition(servoNo31, servoPos31, 2, 7);
+
+  // int servoNo13[] = {5, 4, 13, 12, 2, 10};
+  // int servoPos13[] = {75, 75, 75, 75, 80, 80};
+  // updateServoPosition(servoNo13, servoPos13, 6, 2);
+// }
+
+void walk() {
+  int servoNo11[] = {7, 15};
+  int servoPos11[] = {95, 95};
+  updateServoPosition(servoNo11, servoPos11, 2, 10);
+
+  int servoNo12[] = {13, 12, 14, 2};
+  int servoPos12[] = {107, 107, 100, 100};
+  updateServoPosition(servoNo12, servoPos12, 4, 2);
+
+  int servoNo13[] = {5, 4, 6, 10};
+  int servoPos13[] = {107, 107, 86, 100};
+  updateServoPosition(servoNo13, servoPos13, 4, 2);
+
+  int servoNo31[] = {15, 7};
+  int servoPos31[] = {85, 85};
+  updateServoPosition(servoNo31, servoPos31, 2, 10);
+
+  int servoNo42[] = {5, 4, 6, 10};
+  int servoPos42[] = {73, 73, 80, 80};
+  updateServoPosition(servoNo42, servoPos42, 4, 2);
+
+  int servoNo43[] = {13, 12, 14, 2};
+  int servoPos43[] = {73, 73, 94, 80};
+  updateServoPosition(servoNo43, servoPos43, 4, 2);
 }
 
 void stand() {
-  int servoNo[] = {2, 10, 5, 4, 13, 12};
-  int servoPos[] = {90, 90, 90, 90, 90, 90};
-  updateServoPosition(servoNo, servoPos, 6);
+  int servoNo[] = {2, 10, 5, 4, 13, 12, 7, 15, 6, 14};
+  int servoPos[] = {90, 90, 90, 90, 90, 90, 90, 90, 85, 95};
+  updateServoPosition(servoNo, servoPos, 10, dly10);
+} 
+
+void blanceBodyPosition() {
+  int servoNo[] = {10};
+  int servoPos[] = {140};
+  updateServoPosition(servoNo, servoPos, 1, dly10);
 }
 
 // --------- Temperature and Humidity detection -------------- 
@@ -284,6 +341,7 @@ void checkObstacle() {
   calculateDistance();
   if(distance < 12) {
     Serial.println(distance);
+    Blynk.logEvent("obstacle_alert");
     int rightDistance = lookRight();
     rotateServo(headInitialPosition);
     int leftDistance = lookLeft();
@@ -296,40 +354,51 @@ void checkObstacle() {
   }
 }
 
-// -------------- Fire detection ----------------
+// ------------ Flame detection -----------------
 void detectFlame() {
   if(digitalRead(flameSensorDI) == 1) {
-    int data = analogRead(flameSensorAI);
-    int flameDistance = map(data, 0, 600, flameMinDistance, flameMaxDistance);
-    Blynk.virtualWrite(vFlame, data);
+    // int data = analogRead(flameSensorAI);
+    // int flameDistance = map(data, 0, 600, flameMinDistance, flameMaxDistance);
+    Blynk.logEvent("fire_alert");
+    rightHandUpForward();
+    blanceBodyPosition();
+    delay(200);
+    int updateN0[] = {1};
+    int startTime = millis();
+    int runTime = 5000;
+    int presentTime = millis();
+    digitalWrite(pumpRelay, LOW);
+    while(presentTime - startTime < runTime){
+      int newPositions1[] = {60};
+      updateServoPosition(updateN0, newPositions1, 1, 15);
+      int newPositions2[] = {110};
+      updateServoPosition(updateN0, newPositions2, 1, 15);
+      presentTime = millis();
+    }
+    digitalWrite(pumpRelay, HIGH);
+    int newPositions3[] = {90};
+    updateServoPosition(updateN0, newPositions3, 1, 15);
+    rightHandDown();
+    stand();
+    detectFlame();
   }
 }
 
-unsigned long startTime = millis();
-bool onWalkMode = false, onFireDetectionMode = false, onObstacleDetectionMode = false;
-
-void loop() {
-  Blynk.run();
-
-  // Check and update the Temperature, Humidity and Air quality data in every 5 seconds
-  unsigned long presentTime = millis();
-  int interval = presentTime - startTime;
-  if(interval > 5000){
-    startTime = millis();
-    checkTemperatureAndHumidity();
-    checkAirQuality();
-  }
-
-  if(onWalkMode) {
-    walk();
-  }
-
-  if(onObstacleDetectionMode) {
-    checkObstacle();
-  }
-  
-  if(onFireDetectionMode) {
-    detectFlame();
+// -------------- Motion detection -----------------
+void detectMotion() {
+  int val = digitalRead(pir);   // read sensor value
+  if (val == HIGH) {    
+    if (state == LOW) {
+      Serial.println("Motion Detected");
+      Blynk.logEvent("motion_detection_alert");     
+      state = HIGH;       // update variable state to HIGH
+    }
+  } 
+  else {
+      if (state == HIGH){
+        Serial.println("Motion stopped!");
+        state = LOW;       // update variable state to LOW
+    }
   }
 }
 
@@ -338,22 +407,22 @@ BLYNK_WRITE(V2) {
   int value = param.asInt(); // Get value from app widget
   switch (value) {
     case 1:
-      leftHandDown();
-      break;
-    case 2:
-      leftHandUpForward();
-      break;
-    case 3:
-      leftHandUpSide();
-      break;
-    case 4:
       rightHandDown();
       break;
-    case 5:
+    case 2:
       rightHandUpForward();
       break;
-    case 6:
+    case 3:
       rightHandUpSide();
+      break;
+    case 4:
+      leftHandDown();
+      break;
+    case 5:
+      leftHandUpForward();
+      break;
+    case 6:
+      leftHandUpSide();
       break;
     case 7:
       bothHandDown();
@@ -371,6 +440,9 @@ BLYNK_WRITE(V6) {
   int value = param.asInt(); // Get value from app widget
   if(value == 1) {
     stand();
+    int servoNo[] = {6, 14};
+    int servoPosition[] = {83, 97};
+    updateServoPosition(servoNo, servoPosition, 2, dly5);
     onWalkMode = true;
   } else {
     onWalkMode = false;
@@ -395,5 +467,46 @@ BLYNK_WRITE(V8) {
     onFireDetectionMode = true;
   } else {
     onFireDetectionMode = false;
+  }
+}
+
+// Controll motion detection
+BLYNK_WRITE(V3) {
+  int value = param.asInt(); // Get value from app widget
+  if(value == 1) {
+    onMotionDetectionMode = true;
+  } else {
+    onMotionDetectionMode = false;
+  }
+}
+
+unsigned long startTime = millis();
+
+void loop() {
+  Blynk.run();
+
+  // Check and update the Temperature, Humidity and Air quality data in every 5 seconds
+  unsigned long presentTime = millis();
+  int interval = presentTime - startTime;
+  if(interval > 5000){
+    startTime = millis();
+    checkTemperatureAndHumidity();
+    checkAirQuality();
+  }
+
+  if(onWalkMode) {
+    walk();
+  }
+
+  if(onObstacleDetectionMode) {
+    checkObstacle();
+  }
+  
+  if(onFireDetectionMode) {
+    detectFlame();
+  }
+
+  if(onMotionDetectionMode) {
+    detectMotion();
   }
 }
